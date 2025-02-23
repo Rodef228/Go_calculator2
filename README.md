@@ -49,21 +49,20 @@
 ### Требования
 
 - Установленный Go (версия 1.20 или выше).
-- Установленный Docker (опционально, для запуска через Docker Compose).
 
 ### Запуск
 
 1. Склонируйте репозиторий:
 
    ```bash
-   git clone https://github.com/yourusername/distributed-calculator.git
+   git clone *link*
    cd distributed-calculator
    ```
 
 2. Запустите оркестратор:
 
    ```bash
-   go run ./cmd/calc_service/main.go
+   go run ./cmd/orch/main.go
    ```
 
 3. Запустите агентов (в отдельных терминалах):
@@ -191,24 +190,36 @@ curl --location 'http://localhost:8080/internal/task' \
 
 ```
 calculator/
+│   go.mod
+│   go.sum
+│   README.md
+│   
+├───cmd
+│   ├───agent
+│   │       main.go
+│   │       
+│   └───orch
+│           main.go
 │
-├── cmd/
-│   ├── calc_service/        # Основной сервер (оркестратор)
-│   │   └── main.go
-│   └── agent/               # Агент для выполнения задач
-│       └── main.go
+├───internals
+│   ├───calculator
+│   │       calculator.go
+│   │       calculator_test.go
+│   │       
+│   ├───config
+│   │       config.go
+│   │       
+│   ├───handlers
+│   │       handlers.go
+│   │       handlers_test.go
+│   │
+│   └───models
+│           models.go
 │
-├── internals/
-│   ├── calculator/          # Логика вычисления выражений
-│   │   ├── calculator.go
-│   │   └── calculator_test.go
-│   └── handlers/            # Обработчики HTTP-запросов
-│       ├── handlers.go
-│       └── handlers_test.go
-│
-├── go.mod                   # Зависимости Go
-├── go.sum
-└── README.md                # Документация
+└───web
+        index.html
+        script.js
+        styles.css
 ```
 
 ---
