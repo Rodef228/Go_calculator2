@@ -56,8 +56,8 @@
 1. Склонируйте репозиторий:
 
    ```bash
-   git clone https://github.com/yourusername/distributed-calculator.git
-   cd distributed-calculator
+   git clone https://github.com/Rodef228/Go_calculator2.git
+   cd Go_calculator2
    ```
 
 2. Запустите оркестратор:
