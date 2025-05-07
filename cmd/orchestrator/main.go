@@ -1,15 +1,15 @@
 package main
 
 import (
-	"calculator/internal/agent"
+	"calculator/internal/application"
 	"calculator/pkg/config"
 	"calculator/pkg/logger"
 )
 
 func main() {
 	cfg := config.Load()
-	log := logger.New("agent")
+	log := logger.New("orchestrator")
 
-	agent := agent.New(cfg, log)
-	agent.Run()
+	app := application.New(cfg, log)
+	app.Run()
 }

@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  orchestrator:
+    build: .
+    command: /app/orchestrator
+    ports:
+      - "8080:8080"
+    volumes:
+      - db-data:/data
+    environment:
+      - DB_PATH=/data/calculator.db
+      - JWT_SECRET=hkjvwkjvjvvj3urghjvowhufhkbjnwk
+      - TIME_ADDITION_MS=1
+      - TIME_SUBTRACTION_MS=1
+      - TIME_MULTIPLICATIONS_MS=1
+      - TIME_DIVISIONS_MS=1
+      - COMPUTING_POWER=1
+    depends_on:
+      - agent1
+      - agent2
+
+  agent1:
+    build: .
+    command: /app/agent
+    environment:
+      - AGENT_ID=1
+      - ORCHESTRATOR_URL=http://localhost:8080
+
+  agent2:
+    build: .
+    command: /app/agent
+    environment:
+      - AGENT_ID=2
+      - ORCHESTRATOR_URL=http://localhost:8080
+
+volumes:
+  db-data:
