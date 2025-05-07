@@ -1,4 +1,4 @@
-package agent
+package main
 
 import (
 	"calculator/pkg/config"
@@ -16,14 +16,14 @@ func TestAgent(t *testing.T) {
 	log := logger.NewMockLogger()
 	tests := []struct {
 		name          string
-		config        *config.Config
+		config        config.Config
 		taskResponse  *task.Task
 		expectError   bool
 		expectedCalls int
 	}{
 		{
 			name: "successful task processing",
-			config: &config.Config{
+			config: config.Config{
 				AgentComputingPower: 2,
 			},
 			taskResponse: &task.Task{
@@ -37,7 +37,7 @@ func TestAgent(t *testing.T) {
 		},
 		{
 			name: "division by zero",
-			config: &config.Config{
+			config: config.Config{
 				AgentComputingPower: 1,
 			},
 			taskResponse: &task.Task{
@@ -104,7 +104,7 @@ func TestAgent(t *testing.T) {
 // TestProcessTask directly tests the ProcessTask method
 func TestProcessTask(t *testing.T) {
 	log := logger.NewMockLogger()
-	cfg := &config.Config{AgentComputingPower: 1}
+	cfg := config.Config{AgentComputingPower: 1}
 
 	// Setup mock server
 	var resultSent float64
@@ -183,7 +183,7 @@ func TestFetchTask(t *testing.T) {
 	defer server.Close()
 
 	// Create agent
-	a := New(&config.Config{}, logger.NewMockLogger())
+	a := New(config.Config{}, logger.NewMockLogger())
 	a.client = server.Client()
 
 	task, err := a.fetchTask()

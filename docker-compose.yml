@@ -1,38 +1,60 @@
-version: '3.8'
+name: calculator
 
 services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: calculator
+      POSTGRES_PASSWORD: securepassword
+      POSTGRES_DB: calculator
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U calculator"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   orchestrator:
-    build: .
-    command: /app/orchestrator
+    build:
+      context: .
+      target: orchestrator
     ports:
       - "8080:8080"
-    volumes:
-      - db-data:/data
     environment:
-      - DB_PATH=/data/calculator.db
-      - JWT_SECRET=hkjvwkjvjvvj3urghjvowhufhkbjnwk
-      - TIME_ADDITION_MS=1
-      - TIME_SUBTRACTION_MS=1
-      - TIME_MULTIPLICATIONS_MS=1
-      - TIME_DIVISIONS_MS=1
-      - COMPUTING_POWER=1
+  
+      DB_URL: "postgres://calculator:securepassword@db:5432/calculator?sslmode=disable"
+      JWT_SECRET: "hkjvwkjvjvvj3urghjvowhufhkbjnwk"
+      TIME_ADDITION_MS: 1
+      TIME_SUBTRACTION_MS: 1
+      TIME_MULTIPLICATIONS_MS: 1
+      TIME_DIVISIONS_MS: 1
+      COMPUTING_POWER: 1
     depends_on:
-      - agent1
-      - agent2
+      db:
+        condition: service_healthy
 
   agent1:
-    build: .
-    command: /app/agent
+    build:
+      context: .
+      target: agent
     environment:
-      - AGENT_ID=1
-      - ORCHESTRATOR_URL=http://localhost:8080
+      AGENT_ID: 1
+      ORCHESTRATOR_URL: "http://orchestrator:8080"
+    depends_on:
+      orchestrator:
+        condition: service_started
 
   agent2:
-    build: .
-    command: /app/agent
+    build:
+      context: .
+      target: agent
     environment:
-      - AGENT_ID=2
-      - ORCHESTRATOR_URL=http://localhost:8080
+      AGENT_ID: 2
+      ORCHESTRATOR_URL: "http://orchestrator:8080"
+    depends_on:
+      orchestrator:
+        condition: service_started
 
 volumes:
-  db-data:
+  postgres-data:

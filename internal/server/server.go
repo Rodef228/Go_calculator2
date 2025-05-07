@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"calculator/http/api/handler"
+	"calculator/internal/handler"
 	"calculator/pkg/logger"
 
 	"github.com/go-chi/chi/v5"

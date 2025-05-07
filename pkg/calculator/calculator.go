@@ -2,6 +2,7 @@ package calculator
 
 import (
 	"calculator/internal/service"
+	"calculator/pkg/config"
 	"calculator/pkg/task"
 	"errors"
 	"strconv"
@@ -193,14 +194,14 @@ func (c *Calculator) evalRPN(tokens []token) (float64, error) {
 func getOperationTime(op string) int {
 	switch op {
 	case "+":
-		return 1000 // TIME_ADDITION_MS
+		return config.Configuration.AddTimeMs
 	case "-":
-		return 1000 // TIME_SUBTRACTION_MS
+		return config.Configuration.SubtractTimeMs
 	case "*":
-		return 1000 // TIME_MULTIPLICATIONS_MS
+		return config.Configuration.MultiplyTimeMs
 	case "/":
-		return 1000 // TIME_DIVISIONS_MS
+		return config.Configuration.DivideTimeMs
 	default:
-		return 1000
+		return 0
 	}
 }

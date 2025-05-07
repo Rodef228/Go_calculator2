@@ -6,6 +6,7 @@ import (
 
 	"calculator/internal/service"
 	"calculator/pkg/calculator"
+	"calculator/pkg/config"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
@@ -35,13 +36,13 @@ func (h *TaskHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	var opTime int
 	switch req.Operation {
 	case "+":
-		opTime = 1000 // default add time
+		opTime = config.Configuration.AddTimeMs
 	case "-":
-		opTime = 1000 // default subtract time
+		opTime = config.Configuration.SubtractTimeMs
 	case "*":
-		opTime = 1000 // default multiply time
+		opTime = config.Configuration.MultiplyTimeMs
 	case "/":
-		opTime = 1000 // default divide time
+		opTime = config.Configuration.DivideTimeMs
 	default:
 		render.Render(w, r, ErrBadRequest(errors.New("invalid operation")))
 		return
