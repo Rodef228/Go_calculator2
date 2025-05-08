@@ -6,6 +6,8 @@ import (
 	"calculator/pkg/config"
 	"calculator/pkg/logger"
 	"context"
+	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -15,7 +17,9 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
-	"github.com/golang-migrate/migrate"
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
 type Application struct {
@@ -32,19 +36,20 @@ type Server struct {
 func runMigrations() error {
 	dbURL := os.Getenv("DB_URL")
 	if dbURL == "" {
-		log.Fatal("DB_URL environment variable is not set")
+		return errors.New("DB_URL environment variable is not set")
 	}
 
 	m, err := migrate.New(
-		"file://migrations",
+		"file:///app/migrations", // Обратите внимание на три слеша
 		dbURL)
 	if err != nil {
-		return err
+		return fmt.Errorf("migration init failed: %w", err)
 	}
 
 	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		return err
+		return fmt.Errorf("migration failed: %w", err)
 	}
+
 	return nil
 }
 
@@ -63,11 +68,11 @@ func (s *Server) Shutdown(ctx context.Context) error {
 }
 
 func main() {
-	cfg := config.Load()
+	config.LoadConfig()
 	loog := logger.New("orchestrator")
 
 	app := &Application{
-		config: cfg,
+		config: config.Configuration,
 		logi:   loog,
 	}
 

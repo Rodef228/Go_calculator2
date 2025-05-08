@@ -7,6 +7,7 @@ import (
 	"calculator/pkg/task"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 )
@@ -46,7 +47,8 @@ func (a *Agent) Run() {
 }
 
 func (a *Agent) fetchTask() (*task.Task, error) {
-	resp, err := a.client.Get("http://localhost:8080/internal/task")
+	fmt.Println(config.Configuration.OrchestratorURL + "/internal/task")
+	resp, err := a.client.Get(config.Configuration.OrchestratorURL + "/internal/task")
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +103,7 @@ func (a *Agent) sendResult(id string, result float64) error {
 	}
 
 	resp, err := a.client.Post(
-		"http://localhost:8080/internal/task/"+id,
+		config.Configuration.OrchestratorURL+"/internal/task/"+id,
 		"application/json",
 		bytes.NewBuffer(body),
 	)
@@ -118,9 +120,10 @@ func (a *Agent) sendResult(id string, result float64) error {
 }
 
 func main() {
-	cfg := config.Load()
+	config.Configuration.OrchestratorURL = "http://orchestrator:8080"
+	config.LoadConfig()
 	log := logger.New("agent")
 
-	agent := New(cfg, log)
+	agent := New(config.Configuration, log)
 	agent.Run()
 }

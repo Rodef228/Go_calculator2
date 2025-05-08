@@ -12,6 +12,7 @@ type Config struct {
 	MultiplyTimeMs      int
 	DivideTimeMs        int
 	AgentComputingPower int
+	OrchestratorURL     string
 }
 
 func Load() Config {
@@ -22,6 +23,7 @@ func Load() Config {
 		MultiplyTimeMs:      int(getEnvInt("TIME_MULTIPLICATIONS_MS", 1000)),
 		DivideTimeMs:        int(getEnvInt("TIME_DIVISIONS_MS", 1000)),
 		AgentComputingPower: getEnvInt("COMPUTING_POWER", 10),
+		OrchestratorURL:     getEnv("ORCHESTRATOR_URL", "http://orchestrator:8080"),
 	}
 }
 
@@ -29,7 +31,8 @@ var Configuration Config
 
 func LoadConfig() {
 	Configuration := Load()
-	if Configuration.ServerPort == "" {
+	if Configuration.OrchestratorURL == "" {
+		Configuration.OrchestratorURL = "http://orchestrator:8080"
 	}
 }
 

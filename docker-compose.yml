@@ -30,6 +30,7 @@ services:
       TIME_MULTIPLICATIONS_MS: 1
       TIME_DIVISIONS_MS: 1
       COMPUTING_POWER: 1
+      PORT: 8080
     depends_on:
       db:
         condition: service_healthy
