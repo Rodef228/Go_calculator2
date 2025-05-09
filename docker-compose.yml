@@ -21,38 +21,36 @@ services:
       target: orchestrator
     ports:
       - "8080:8080"
+      - "8082:8082"
     environment:
-  
+      POSTGRES_USER: calculator
+      POSTGRES_PASSWORD: securepassword
+      POSTGRES_DB: calculator
       DB_URL: "postgres://calculator:securepassword@db:5432/calculator?sslmode=disable"
+
       JWT_SECRET: "hkjvwkjvjvvj3urghjvowhufhkbjnwk"
       TIME_ADDITION_MS: 1
       TIME_SUBTRACTION_MS: 1
       TIME_MULTIPLICATIONS_MS: 1
       TIME_DIVISIONS_MS: 1
       COMPUTING_POWER: 1
-      PORT: 8080
+      PORT: "8080"
+      ORCHESTRATOR_URL: "orchestrator:8080"
     depends_on:
       db:
         condition: service_healthy
 
-  agent1:
+  agent:
     build:
       context: .
       target: agent
     environment:
       AGENT_ID: 1
-      ORCHESTRATOR_URL: "http://orchestrator:8080"
-    depends_on:
-      orchestrator:
-        condition: service_started
+      ORCHESTRATOR_URL: "orchestrator:8080"
+    ports:
+      - "8081:8080"
 
-  agent2:
-    build:
-      context: .
-      target: agent
-    environment:
-      AGENT_ID: 2
-      ORCHESTRATOR_URL: "http://orchestrator:8080"
+
     depends_on:
       orchestrator:
         condition: service_started
