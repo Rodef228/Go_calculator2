@@ -13,9 +13,9 @@ import (
 
 func (a *Agent) Connect() {
 	log.Printf("connecting to the server...")
-	orchURL := os.Getenv("ORCHESTRATOR_URL")
+	orchURL := os.Getenv("ORCHESTRATOR_GRPS_URL")
 	for {
-		conn, err := grpc.NewClient(
+		conn, err := grpc.Dial(
 			orchURL,
 			grpc.WithTransportCredentials(insecure.NewCredentials()))
 
@@ -88,6 +88,7 @@ func handleStream(client pb.OrchestratorClient) error {
 					log.Printf("Send error: %v", err)
 					return
 				}
+
 			case <-ctx.Done():
 				return
 			case <-done:

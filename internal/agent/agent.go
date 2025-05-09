@@ -29,6 +29,8 @@ func New(cfg config.Config) *Agent {
 }
 
 func (a *Agent) Run() {
+	tasksCh = make(chan *Task, a.config.AgentComputingPower)
+	resultsCh = make(chan *models.Result, a.config.AgentComputingPower)
 	go a.Connect()
 
 	for i := range a.config.AgentComputingPower {

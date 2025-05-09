@@ -14,7 +14,7 @@ import (
 
 const (
 	tcp         = "tcp"
-	addr string = ":8081"
+	addr string = ":50051"
 )
 
 type Server struct {
@@ -89,7 +89,7 @@ func (s *Server) Calculate(stream pb.Orchestrator_CalculateServer) error {
 func runGRPC() {
 	log.Println("Starting tcp server...")
 
-	lis, err := net.Listen("tcp", ":8082") // Отдельный порт для gRPC
+	lis, err := net.Listen("tcp", ":50051") // Отдельный порт для gRPC
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}

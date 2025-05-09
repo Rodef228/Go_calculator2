@@ -3,6 +3,8 @@ name: calculator
 services:
   db:
     image: postgres:15-alpine
+    ports:
+      - "5432:5432"
     environment:
       POSTGRES_USER: calculator
       POSTGRES_PASSWORD: securepassword
@@ -21,7 +23,7 @@ services:
       target: orchestrator
     ports:
       - "8080:8080"
-      - "8082:8082"
+      - "50051:50051"
     environment:
       POSTGRES_USER: calculator
       POSTGRES_PASSWORD: securepassword
@@ -47,6 +49,7 @@ services:
     environment:
       AGENT_ID: 1
       ORCHESTRATOR_URL: "orchestrator:8080"
+      ORCHESTRATOR_GRPS_URL: "orchestrator:50051"
     ports:
       - "8081:8080"
 

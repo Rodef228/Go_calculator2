@@ -1,6 +1,7 @@
 package orchestrator
 
 import (
+	"calculator/internal/database"
 	"context"
 	"encoding/json"
 	"log"
@@ -10,7 +11,6 @@ import (
 	"sync"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v4" // Обратите внимание на использование pgx/v4
 )
 
@@ -81,36 +81,53 @@ func (o *Orchestrator) Run() {
 	o.db, err = pgx.Connect(context.Background(), DB_URL)
 	if err != nil {
 		log.Fatalf("Unable to connect to database: %v\n", err)
+	} else {
+		log.Printf("Connected to database")
 	}
 	defer o.db.Close(context.Background())
+
+	if err := runMigrations(); err != nil {
+		log.Fatalf("Migrations failed: %v", err)
+	}
 
 	// запуск менеджера каналов выражений
 	StartManager()
 	// запуск сервера для общения с агентом
 	go runGRPC()
 
-	// Создание маршрутизатора chi
-	r := chi.NewRouter()
-	r.Use(middleware.Logger) // Логирование запросов
+	db, err := database.NewDB(DB_URL)
+	if err != nil {
+		log.Fatalf("Failed to connect to DB: %v", err)
+	}
 
-	// Применяем logsMiddleware ко всем маршрутам
+	r := chi.NewRouter()
 	r.Use(logsMiddleware)
 
-	// Определяем маршруты без дополнительных middleware
-	r.Post("/api/v1/register", RegisterHandler)
-	r.Post("/api/v1/login", LoginHandler)
+	// Передаём db в хендлеры
+	r.Post("/api/v1/register", func(w http.ResponseWriter, r *http.Request) {
+		RegisterHandler(w, r, db)
+	})
+	r.Post("/api/v1/login", func(w http.ResponseWriter, r *http.Request) {
+		LoginHandler(w, r, db)
+	})
 
-	// Создаем новый маршрутизатор для маршрута с несколькими middleware
 	calculateRouter := chi.NewRouter()
 	calculateRouter.Use(authMiddleware)
-	calculateRouter.Use(databaseMiddleware)
-	calculateRouter.Post("/", ExpressionHandler)
+	calculateRouter.Use(databaseMiddleware(db)) // передаём db в middleware
+	calculateRouter.Post("/", func(w http.ResponseWriter, r *http.Request) {
+		expr := &Expression{
+			exp: "2+2",
+			id:  123,
+		}
+		ctx := context.WithValue(r.Context(), ctxKey, expr)
+		ExpressionHandler(w, r.WithContext(ctx), db)
+	})
 
-	// Добавляем новый маршрутизатор для /api/v1/calculate
 	r.Mount("/api/v1/calculate", calculateRouter)
 
-	// Определяем маршрут для получения данных с authMiddleware
-	r.With(authMiddleware).Get("/api/v1/expressions/", GetDataHandler)
+	r.With(authMiddleware).Get("/api/v1/expressions/", func(w http.ResponseWriter, r *http.Request) {
+		GetDataHandler(w, r, db)
+	})
 
 	log.Printf("Starting server on port '%s'", orchURL)
 	log.Fatal(http.ListenAndServe(orchURL, r))

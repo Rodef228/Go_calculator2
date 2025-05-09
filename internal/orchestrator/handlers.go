@@ -3,7 +3,6 @@ package orchestrator
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -17,8 +16,7 @@ import (
 	"calculator/pkg/pass_system/password"
 )
 
-var DB database.DB
-
+// Middleware для логирования
 func logsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Method: %s, URL: %s", r.Method, r.URL)
@@ -29,6 +27,7 @@ func logsMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// Middleware для аутентификации
 func authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var token string
@@ -40,24 +39,20 @@ func authMiddleware(next http.Handler) http.Handler {
 			authHeader := r.Header.Get("Authorization")
 			if authHeader == "" {
 				errorResponse(w, "authorization is required", http.StatusUnauthorized)
-				log.Printf("Code: %v, user unauthorized", http.StatusUnauthorized)
 				return
 			}
 
 			tokenParts := strings.Split(authHeader, " ")
 			if len(tokenParts) != 2 || tokenParts[0] != "Bearer" {
 				errorResponse(w, "invalid token format", http.StatusUnauthorized)
-				log.Printf("Code: %v, invalid token format", http.StatusUnauthorized)
 				return
 			}
 			token = tokenParts[1]
-			log.Print("token was taken from header")
 		}
 
 		claims, id := jwt.Verify(token)
 		if !claims {
 			errorResponse(w, "invalid token", http.StatusUnauthorized)
-			log.Printf("Code: %v, invalid token", http.StatusUnauthorized)
 			return
 		}
 
@@ -66,17 +61,20 @@ func authMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func databaseMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := context.WithValue(r.Context(), "DB", DB)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
+// Middleware для передачи DB в контекст
+func databaseMiddleware(db *database.DB) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := context.WithValue(r.Context(), "DB", db)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
 }
 
-func RegisterHandler(w http.ResponseWriter, r *http.Request) {
+// Регистрация пользователя
+func RegisterHandler(w http.ResponseWriter, r *http.Request, db *database.DB) {
 	if r.Method != http.MethodPost {
 		errorResponse(w, "invalid request method", http.StatusMethodNotAllowed)
-		log.Printf("Code: %v, invalid request method", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -87,43 +85,40 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	err := json.NewDecoder(r.Body).Decode(&body)
 	if err != nil {
 		errorResponse(w, "invalid request body", http.StatusBadRequest)
-		log.Printf("Code: %v, json decoding error", http.StatusBadRequest)
 		return
 	}
 
 	if len(body.Password) == 0 {
 		errorResponse(w, "password cannot be empty", http.StatusForbidden)
-		log.Printf("Code: %v, empty password", http.StatusForbidden)
 		return
 	}
 
 	pass, err := password.Generate(body.Password)
 	if err != nil {
 		errorResponse(w, "internal server error", http.StatusInternalServerError)
-		log.Printf("Code: %v, %s", http.StatusInternalServerError, err)
 		return
 	}
 
-	ctx := r.Context()
 	user := &models.User{
 		Login:    body.Login,
 		Password: pass,
 	}
-	_, err = DB.InsertUser(ctx, user) // Используем DB для вставки пользователя
+
+	id, err := db.InsertUser(r.Context(), user)
 	if err != nil {
 		errorResponse(w, "user already exists", http.StatusConflict)
-		log.Printf("Code: %v, user %s already exists", http.StatusConflict, body.Login)
 		return
 	}
 
-	log.Printf("user: %v has successfully registered", user.Login)
+	log.Printf("user: %v has successfully registered (ID: %d)", user.Login, id)
 	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]int{"id": id})
 }
 
-func LoginHandler(w http.ResponseWriter, r *http.Request) {
+// Авторизация пользователя
+func LoginHandler(w http.ResponseWriter, r *http.Request, db *database.DB) {
 	if r.Method != http.MethodPost {
 		errorResponse(w, "invalid request method", http.StatusMethodNotAllowed)
-		log.Printf("Code: %v, invalid request method", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -134,30 +129,23 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	err := json.NewDecoder(r.Body).Decode(&body)
 	if err != nil {
 		errorResponse(w, "invalid request body", http.StatusBadRequest)
-		log.Printf("Code: %v, json decoding error", http.StatusBadRequest)
 		return
 	}
 
-	ctx := r.Context()
-	user, err := DB.SelectUserByLogin(ctx, body.Login) // Используем DB для выбора пользователя
+	id, pass, err := db.SelectUserByLogin(r.Context(), body.Login)
 	if err != nil {
 		errorResponse(w, "user not found", http.StatusNotFound)
-		log.Printf("Code: %v, user %v was not found", http.StatusNotFound, body.Login)
-		return
-	}
-	if err := password.Compare(user.Password, body.Password); err != nil {
-		errorResponse(w, "incorrect password", http.StatusForbidden)
-		log.Printf("Code: %v, incorrect password", http.StatusForbidden)
 		return
 	}
 
-	var resp struct {
-		Jwt string `json:"jwt"`
+	if err := password.Compare(pass, body.Password); err != nil {
+		errorResponse(w, "incorrect password", http.StatusForbidden)
+		return
 	}
-	token, err := jwt.Generate(int(user.ID))
+
+	token, err := jwt.Generate(int(id))
 	if err != nil {
 		errorResponse(w, "internal server error", http.StatusInternalServerError)
-		log.Printf("Code: %v, error with generating token", http.StatusInternalServerError)
 		return
 	}
 
@@ -170,102 +158,78 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteStrictMode,
 	})
 
-	resp.Jwt = token
 	w.WriteHeader(http.StatusOK)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	json.NewEncoder(w).Encode(map[string]string{"jwt": token})
 }
 
-func ExpressionHandler(w http.ResponseWriter, r *http.Request) {
-	expr := r.Context().Value(ctxKey).(*Expression)
+// Вычисление выражения
+func ExpressionHandler(w http.ResponseWriter, r *http.Request, db *database.DB) {
+	var req struct {
+		Expression string `json:"expression"`
+	}
 
-	// создаем аст по выражению
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		errorResponse(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Создаём выражение локально
+	expr := &Expression{
+		exp: req.Expression,
+		id:  0, // можно генерировать при сохранении в БД
+	}
+
 	astRoot, err := ast.Build(expr.exp)
 	if err != nil {
-		errStr := fmt.Sprintf("%s", err)
-
-		log.Printf("Expression %d: AST build failed - %s", expr.id, errStr)
-		if err := DB.UpdateExpression(context.Background(), expr.id, errStr, 0.0); err != nil {
-			log.Printf("Failed to update expression %d: %v", expr.id, err)
-		}
+		db.UpdateExpression(r.Context(), expr.id, err.Error(), 0)
+		errorResponse(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	exp := NewExpression(astRoot)
 
-	res, err := exp.calc()
+	calc := NewExpression(astRoot)
+	result, err := calc.calc()
 	if err != nil {
-		log.Printf("Expression %v: zero division error detected", expr.id)
-		if err := DB.UpdateExpression(context.Background(), expr.id, "zero division error", 0.0); err != nil {
-			log.Printf("Failed to update expression %d: %v", expr.id, err)
-		}
+		db.UpdateExpression(r.Context(), expr.id, "zero division error", 0)
+		errorResponse(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	log.Printf("Expression %v calculated successfully", expr.id)
 
-	if err := DB.UpdateExpression(context.Background(), expr.id, "done", res); err != nil {
-		log.Printf("Failed to update expression %d: %v", expr.id, err)
-	}
+	// Сохраняем результат в БД (если нужно)
+	db.UpdateExpression(r.Context(), expr.id, "done", result)
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]float64{"result": result})
 }
 
-func GetDataHandler(w http.ResponseWriter, r *http.Request) {
-	id := strings.TrimPrefix(r.URL.Path, "/api/v1/expressions/")
-	if checkId(id) {
-		idInt, err := strconv.Atoi(id)
-		if err != nil {
-			errStr := fmt.Sprintf("%s", err)
-			errorResponse(w, "internal server error", http.StatusInternalServerError)
-			log.Printf("Code: %v, %s", http.StatusInternalServerError, errStr)
-			return
-		}
+// Получение данных по ID или всех выражений
+func GetDataHandler(w http.ResponseWriter, r *http.Request, db *database.DB) {
+	path := strings.TrimPrefix(r.URL.Path, "/api/v1/expressions/")
+	if checkId(path) {
+		idInt, _ := strconv.Atoi(path)
+		userId := r.Context().Value(userID).(int)
 
-		userId := r.Context().Value(userID)
-		data, err := DB.SelectExprByID(r.Context(), idInt, userId.(int)) // Используем db для выбора выражения по ID
+		expr, _, err := db.SelectExprByID(r.Context(), idInt, userId)
 		if err != nil {
 			errorResponse(w, "expression does not exist", http.StatusNotFound)
-			log.Printf("Code: %v, %s", http.StatusNotFound, err)
 			return
 		}
 
-		// Сериализация данных в JSON
-		jsonData, err := json.MarshalIndent(data, "", "  ")
-		if err != nil {
-			errorResponse(w, fmt.Sprintf("%s", err), http.StatusInternalServerError)
-			log.Printf("Code: %v, error with marshaling json", http.StatusInternalServerError)
-			return
-		}
-
+		jsonData, _ := json.MarshalIndent(expr, "", "  ")
 		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Content-Type", "application/json")
-		_, err = w.Write(jsonData) // Отправляем сериализованные данные пользователю
-		if err != nil {
-			errorResponse(w, "error with json data", http.StatusInternalServerError)
-			log.Printf("Code: %v, Internal server error", http.StatusInternalServerError)
-			return
-		}
+		w.Write(jsonData)
 		return
 	}
 
-	data, err := DB.SelectExpressions(r.Context(), r.Context().Value(userID).(int)) // Используем db для выбора всех выражений пользователя
+	userId := r.Context().Value(userID).(int)
+	data, err := db.SelectExpressions(r.Context(), userId)
 	if err != nil {
 		errorResponse(w, "you haven't calculated any expressions yet", http.StatusInternalServerError)
-		log.Printf("Code: %v, empty base for user %v", http.StatusInternalServerError, userID)
 		return
 	}
 
-	// Сериализация данных в JSON
-	jsonData, err := json.MarshalIndent(data, "", "  ")
-	if err != nil {
-		errorResponse(w, fmt.Sprintf("%s", err), http.StatusInternalServerError)
-		log.Printf("Code: %v, error with marshaling json", http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK) // устанавливаем статус 200 OK
+	jsonData, _ := json.MarshalIndent(data, "", "  ")
+	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	_, err = w.Write(jsonData) // Отправляем сериализованные данные пользователю
-	if err != nil {
-		errorResponse(w, "error with json data", http.StatusInternalServerError)
-		log.Printf("Code: %v, Internal server error", http.StatusInternalServerError)
-		return
-	}
+	w.Write(jsonData)
 }
